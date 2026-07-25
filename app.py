@@ -12,8 +12,8 @@ st.set_page_config(page_title="ניהול משימות - רכז שכבה", layou
 st.markdown(
     """
     <style>
-    html, body, [class*="css"] { direction: rtl; text-align: right; }
-    .stTextArea textarea, .stTextInput input, .stSelectbox, .stDateInput input { direction: rtl; text-align: right; }
+    [data-testid="stMain"] { direction: rtl; }
+    .stTextArea textarea, .stTextInput input, .stDateInput input { direction: rtl; text-align: right; }
     .urgent-badge { background:#e74c3c; color:white; padding:2px 8px; border-radius:8px; font-size:0.8em; }
     </style>
     """,
