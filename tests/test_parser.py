@@ -36,6 +36,17 @@ def test_urgent_absent():
     assert span is None
 
 
+def test_urgent_bahul_synonym():
+    assert extract_urgent("המצב בהול, צריך לטפל עכשיו")[0] is True
+
+
+def test_urgent_not_falsely_matched_inside_ladchof():
+    # "לדחוף" (the verb "to push") contains "דחוף" as a substring but is not urgency
+    urgent, span = extract_urgent("צריך לדחוף את הפגישה למחר")
+    assert urgent is False
+    assert span is None
+
+
 # ---------- extract_deadline: weekday ----------
 
 def test_deadline_next_weekday():

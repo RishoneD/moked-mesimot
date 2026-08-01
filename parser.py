@@ -8,7 +8,7 @@ import re
 import datetime as dt
 from typing import Optional, Tuple, List
 
-URGENT_PATTERN = re.compile(r"דחוף|דחופ(ה|ות)|בדחיפות")
+URGENT_PATTERN = re.compile(r"\bדחוף\b|\bדחופ(ה|ות)\b|\bבדחיפות\b|\bבהול(ה|ים|ות)?\b")
 
 WEEKDAY_MAP = {
     "ראשון": 6, "שני": 0, "שלישי": 1, "רביעי": 2,
