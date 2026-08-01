@@ -5,8 +5,9 @@ from sqlalchemy import select
 
 from db import init_db, get_session, Task, Rule, ALL_STATUSES, STATUS_PENDING, STATUS_CLOSED
 from parser import parse_task
+from whatsapp import build_task_message, build_weekly_message, build_wa_link
 
-APP_VERSION = "v0.2"
+APP_VERSION = "v0.3"
 
 st.set_page_config(page_title="ניהול משימות - רכז שכבה", layout="wide")
 
@@ -141,18 +142,27 @@ elif page == "📑 כל המשימות":
     tasks = session.execute(query).scalars().all()
     tasks = [t for t in tasks if t.status in status_filter]
 
+    st.link_button(
+        "📤 ייצוא סיכום שבועי לווטסאפ",
+        build_wa_link(build_weekly_message(tasks)),
+        help="כולל את המשימות המוצגות כרגע עם דדליין ב-7 הימים הקרובים",
+    )
+
     if not tasks:
         st.info("אין משימות להצגה.")
 
     for task in tasks:
         with st.container(border=True):
-            c_badge, c_title, c_assignee, c_deadline, c_status, c_update, c_return = st.columns(
-                [0.6, 3, 1.6, 1.3, 1.6, 0.6, 0.6]
+            c_badge, c_title, c_assignee, c_deadline, c_status, c_update, c_return, c_wa = st.columns(
+                [0.6, 3, 1.6, 1.3, 1.6, 0.6, 0.6, 0.6]
             )
             c_badge.markdown("🔴" if task.urgent else "")
             c_title.markdown(f"**{task.title or task.original_text}**")
             c_assignee.caption(f"👤 {task.assignee}" if task.assignee else "")
             c_deadline.caption(f"📅 {task.deadline}" if task.deadline else "")
+            c_wa.link_button(
+                "📤", build_wa_link(build_task_message(task)), help="שתף משימה זו בווטסאפ"
+            )
 
             status_key = f"all_status_{task.id}"
             new_status = c_status.selectbox(
