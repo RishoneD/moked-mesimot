@@ -45,9 +45,21 @@ if page == "➕ הוספת משימה":
     st.caption("כתוב את המשימה במשפט חופשי - המערכת תנסה לזהות למי מיועד, דדליין ודחיפות. "
                "כל משימה חדשה תמתין לאישורך בתור הבדיקה.")
 
-    text = st.text_area("משימה חדשה", height=100, placeholder="לדוגמה: לתאם עם המחנכת של י'2 שיחה עם הורה עד יום רביעי - דחוף")
+    if "new_task_input_version" not in st.session_state:
+        st.session_state["new_task_input_version"] = 0
+    input_key = f"new_task_text_{st.session_state['new_task_input_version']}"
 
-    if st.button("הוסף לתור הבדיקה", type="primary", disabled=not text.strip()):
+    text = st.text_area(
+        "משימה חדשה", height=100,
+        placeholder="לדוגמה: לתאם עם המחנכת של י'2 שיחה עם הורה עד יום רביעי - דחוף",
+        key=input_key,
+    )
+
+    col1, col2 = st.columns([2, 1])
+    add_clicked = col1.button("הוסף לתור הבדיקה", type="primary", disabled=not text.strip())
+    reset_clicked = col2.button("איפוס")
+
+    if add_clicked:
         alias_rules = get_alias_rules(session)
         parsed = parse_task(text.strip(), alias_rules)
         task = Task(
@@ -60,7 +72,12 @@ if page == "➕ הוספת משימה":
         )
         session.add(task)
         session.commit()
+        st.session_state["new_task_input_version"] += 1
         st.success("המשימה נוספה לתור הבדיקה ✅")
+        st.rerun()
+
+    if reset_clicked:
+        st.session_state["new_task_input_version"] += 1
         st.rerun()
 
 # ============================================================
@@ -125,16 +142,31 @@ elif page == "📑 כל המשימות":
         st.info("אין משימות להצגה.")
 
     for task in tasks:
-        urgent_prefix = "🔴 " if task.urgent else ""
         with st.container(border=True):
-            st.markdown(f"### {urgent_prefix}{task.title or task.original_text}")
-            meta = []
-            if task.assignee:
-                meta.append(f"👤 {task.assignee}")
-            if task.deadline:
-                meta.append(f"📅 {task.deadline}")
-            meta.append(f"🏷️ {task.status}")
-            st.caption(" | ".join(meta))
+            c_badge, c_title, c_assignee, c_deadline, c_status, c_update, c_return = st.columns(
+                [0.6, 3, 1.6, 1.3, 1.6, 0.6, 0.6]
+            )
+            c_badge.markdown("🔴" if task.urgent else "")
+            c_title.markdown(f"**{task.title or task.original_text}**")
+            c_assignee.caption(f"👤 {task.assignee}" if task.assignee else "")
+            c_deadline.caption(f"📅 {task.deadline}" if task.deadline else "")
+
+            status_key = f"all_status_{task.id}"
+            new_status = c_status.selectbox(
+                "סטטוס", ALL_STATUSES,
+                index=ALL_STATUSES.index(task.status),
+                key=status_key,
+                label_visibility="collapsed",
+            )
+            if c_update.button("✓", key=f"all_update_{task.id}", help="עדכן סטטוס"):
+                task.status = new_status
+                session.commit()
+                st.rerun()
+            if task.status != STATUS_PENDING:
+                if c_return.button("↩️", key=f"all_return_{task.id}", help="החזר לתור בדיקה"):
+                    task.status = STATUS_PENDING
+                    session.commit()
+                    st.rerun()
 
 # ============================================================
 # מסך 4: תבניות וחוקים - כאן נצבר "הידע" שהרכז מוסיף ידנית
