@@ -6,6 +6,8 @@ from sqlalchemy import select
 from db import init_db, get_session, Task, Rule, ALL_STATUSES, STATUS_PENDING, STATUS_CLOSED
 from parser import parse_task
 
+APP_VERSION = "v0.2"
+
 st.set_page_config(page_title="ניהול משימות - רכז שכבה", layout="wide")
 
 # ---------- עיצוב RTL ----------
@@ -34,6 +36,7 @@ page = st.sidebar.radio(
     "בחר מסך",
     ["➕ הוספת משימה", "✅ תור בדיקה", "📑 כל המשימות", "⚙️ תבניות וחוקים"],
 )
+st.sidebar.caption(APP_VERSION)
 
 session = get_session()
 
