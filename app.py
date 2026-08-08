@@ -21,7 +21,7 @@ st.markdown(
     """
     <style>
     [data-testid="stMain"] { direction: rtl; }
-    [data-testid="stHeadingWithActionElements"] { text-align: right; }
+    [data-testid="stHeadingWithActionElements"], [data-testid="stMarkdownContainer"] { text-align: right; }
     .stTextArea textarea, .stTextInput input, .stDateInput input { direction: rtl; text-align: right; }
     .urgent-badge { background:#e74c3c; color:white; padding:2px 8px; border-radius:8px; font-size:0.8em; }
     </style>
