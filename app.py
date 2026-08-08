@@ -21,6 +21,7 @@ st.markdown(
     """
     <style>
     [data-testid="stMain"] { direction: rtl; }
+    [data-testid="stHeadingWithActionElements"] { text-align: right; }
     .stTextArea textarea, .stTextInput input, .stDateInput input { direction: rtl; text-align: right; }
     .urgent-badge { background:#e74c3c; color:white; padding:2px 8px; border-radius:8px; font-size:0.8em; }
     </style>
@@ -49,7 +50,7 @@ if st.session_state.role is None:
     if "login_choice" not in st.session_state:
         st.session_state.login_choice = None
 
-    st.write("מי אתה/את?")
+    st.write("מי את/ה?")
     col1, col2 = st.columns(2)
     if col1.button("🧑‍💼\n\n**אני רכז/ת**", use_container_width=True):
         st.session_state.login_choice = "coordinator"
