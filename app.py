@@ -8,7 +8,7 @@ from db import init_db, get_session, Task, Rule, Teacher, ALL_STATUSES, STATUS_P
 from parser import parse_task
 from whatsapp import build_task_message, build_weekly_message, build_wa_link
 
-APP_VERSION = "v0.4"
+APP_VERSION = "v0.4.1"
 
 # קוד גישה לרכז/ת - בפרודקשן מוגדר כ-secret ב-Streamlit Cloud, לא בקוד.
 # "changeme" הוא ברירת מחדל לפיתוח מקומי בלבד.
@@ -45,9 +45,18 @@ if "role" not in st.session_state:
 
 if st.session_state.role is None:
     st.title("📋 ניהול משימות שכבה")
-    choice = st.radio("מי אתה/את?", ["אני רכז/ת", "אני מחנכ/ת"], index=None)
 
-    if choice == "אני רכז/ת":
+    if "login_choice" not in st.session_state:
+        st.session_state.login_choice = None
+
+    st.write("מי אתה/את?")
+    col1, col2 = st.columns(2)
+    if col1.button("🧑‍💼\n\n**אני רכז/ת**", use_container_width=True):
+        st.session_state.login_choice = "coordinator"
+    if col2.button("🧑‍🏫\n\n**אני מחנכ/ת**", use_container_width=True):
+        st.session_state.login_choice = "teacher"
+
+    if st.session_state.login_choice == "coordinator":
         code = st.text_input("קוד גישה", type="password")
         if st.button("כניסה", type="primary"):
             if code == COORDINATOR_CODE:
@@ -56,7 +65,7 @@ if st.session_state.role is None:
             else:
                 st.error("קוד גישה שגוי")
 
-    elif choice == "אני מחנכ/ת":
+    elif st.session_state.login_choice == "teacher":
         code = st.text_input("קוד זיהוי אישי", type="password")
         if st.button("כניסה", type="primary"):
             teacher = session.execute(select(Teacher).where(Teacher.code == code)).scalars().first()
@@ -95,7 +104,7 @@ if st.sidebar.button("התנתקות"):
 # ============================================================
 if page == "➕ הוספת משימה":
     st.header("הוספת משימה חדשה")
-    st.caption("כתוב את המשימה במשפט חופשי - המערכת תנסה לזהות למי מיועד, דדליין ודחיפות. "
+    st.caption("כתוב את המשימה במשפט חופשי - המערכת תנסה לזהות למי מיועד, תאריך יעד ודחיפות. "
                "כל משימה חדשה תמתין לאישורך בתור הבדיקה.")
 
     if "new_task_input_version" not in st.session_state:
@@ -156,7 +165,7 @@ elif page == "✅ תור בדיקה":
                 default_deadline = dt.date.fromisoformat(task.deadline) if task.deadline else None
             except ValueError:
                 default_deadline = None
-            new_deadline = col3.date_input("דדליין", value=default_deadline, key=f"deadline_{task.id}")
+            new_deadline = col3.date_input("תאריך יעד", value=default_deadline, key=f"deadline_{task.id}")
             new_urgent = col4.checkbox("דחוף", value=task.urgent, key=f"urgent_{task.id}")
 
             new_status = st.selectbox(
@@ -194,7 +203,7 @@ elif page == "📑 כל המשימות":
     st.link_button(
         "📤 ייצוא סיכום שבועי לווטסאפ",
         build_wa_link(build_weekly_message(tasks)),
-        help="כולל את המשימות המוצגות כרגע עם דדליין ב-7 הימים הקרובים",
+        help="כולל את המשימות המוצגות כרגע עם תאריך יעד ב-7 הימים הקרובים",
     )
 
     if not tasks:
@@ -264,12 +273,13 @@ elif page == "👩‍🏫 תצוגת מחנכים":
                 {
                     "כותרת": t.title or t.original_text,
                     "למי מיועד": t.assignee or "",
-                    "דדליין": t.deadline or "",
+                    "תאריך יעד": t.deadline or "",
                     "דחוף": "🔴" if t.urgent else "",
                     "סטטוס": t.status,
                 }
                 for t in view_tasks
             ],
+            column_order=["סטטוס", "דחוף", "תאריך יעד", "למי מיועד", "כותרת"],
             hide_index=True,
             use_container_width=True,
         )
@@ -301,6 +311,10 @@ elif page == "🔑 ניהול קודי מחנכים":
     teachers = session.execute(select(Teacher)).scalars().all()
     if not teachers:
         st.info("עדיין לא הוגדרו מחנכים.")
+    else:
+        h1, h2, h3 = st.columns([3, 3, 1])
+        h1.markdown("**שם**")
+        h2.markdown("**קוד**")
     for t in teachers:
         c1, c2, c3 = st.columns([3, 3, 1])
         c1.write(t.name)

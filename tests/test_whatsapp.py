@@ -30,7 +30,7 @@ def test_task_message_omits_missing_fields():
     task = make_task(title="לתאם שיחה", assignee=None, deadline=None, urgent=False)
     msg = build_task_message(task)
     assert "עבור" not in msg
-    assert "דדליין" not in msg
+    assert "תאריך יעד" not in msg
     assert "דחוף" not in msg
 
 
