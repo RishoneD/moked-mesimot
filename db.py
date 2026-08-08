@@ -60,6 +60,19 @@ class Rule(Base):
     created_at = Column(DateTime, default=dt.datetime.utcnow)
 
 
+class Teacher(Base):
+    """
+    מחנכים עם קוד זיהוי אישי לכניסה למסך התצוגה שלהם.
+    מוגדר ומנוהל ידנית ע"י הרכז/ת - לא סיסמה מוצפנת, רק "דלת נעולה" פשוטה.
+    """
+    __tablename__ = "teachers"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False)
+    code = Column(String(50), nullable=False, unique=True)
+    created_at = Column(DateTime, default=dt.datetime.utcnow)
+
+
 def init_db():
     Base.metadata.create_all(engine)
 

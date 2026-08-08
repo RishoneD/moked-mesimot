@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
+import os
 import datetime as dt
 import streamlit as st
 from sqlalchemy import select
 
-from db import init_db, get_session, Task, Rule, ALL_STATUSES, STATUS_PENDING, STATUS_CLOSED
+from db import init_db, get_session, Task, Rule, Teacher, ALL_STATUSES, STATUS_PENDING, STATUS_CLOSED
 from parser import parse_task
 from whatsapp import build_task_message, build_weekly_message, build_wa_link
 
-APP_VERSION = "v0.3"
+APP_VERSION = "v0.4"
+
+# קוד גישה לרכז/ת - בפרודקשן מוגדר כ-secret ב-Streamlit Cloud, לא בקוד.
+# "changeme" הוא ברירת מחדל לפיתוח מקומי בלבד.
+COORDINATOR_CODE = os.environ.get("COORDINATOR_CODE", "changeme")
 
 st.set_page_config(page_title="ניהול משימות - רכז שכבה", layout="wide")
 
@@ -24,6 +29,7 @@ st.markdown(
 )
 
 init_db()
+session = get_session()
 
 
 def get_alias_rules(session):
@@ -31,15 +37,58 @@ def get_alias_rules(session):
     return [(r.pattern, r.value) for r in rules]
 
 
-# ---------- ניווט ----------
-st.sidebar.title("📋 ניהול משימות שכבה")
-page = st.sidebar.radio(
-    "בחר מסך",
-    ["➕ הוספת משימה", "✅ תור בדיקה", "📑 כל המשימות", "⚙️ תבניות וחוקים"],
-)
-st.sidebar.caption(APP_VERSION)
+# ============================================================
+# כניסה - בחירת תפקיד וקוד גישה
+# ============================================================
+if "role" not in st.session_state:
+    st.session_state.role = None
 
-session = get_session()
+if st.session_state.role is None:
+    st.title("📋 ניהול משימות שכבה")
+    choice = st.radio("מי אתה/את?", ["אני רכז/ת", "אני מחנכ/ת"], index=None)
+
+    if choice == "אני רכז/ת":
+        code = st.text_input("קוד גישה", type="password")
+        if st.button("כניסה", type="primary"):
+            if code == COORDINATOR_CODE:
+                st.session_state.role = "coordinator"
+                st.rerun()
+            else:
+                st.error("קוד גישה שגוי")
+
+    elif choice == "אני מחנכ/ת":
+        code = st.text_input("קוד זיהוי אישי", type="password")
+        if st.button("כניסה", type="primary"):
+            teacher = session.execute(select(Teacher).where(Teacher.code == code)).scalars().first()
+            if teacher:
+                st.session_state.role = "teacher"
+                st.session_state.teacher_name = teacher.name
+                st.rerun()
+            else:
+                st.error("קוד לא נמצא - בדוק/י מול הרכז/ת")
+
+    session.close()
+    st.stop()
+
+# ---------- ניווט ----------
+if st.session_state.role == "coordinator":
+    st.sidebar.title("📋 ניהול משימות שכבה")
+    page = st.sidebar.radio(
+        "בחר מסך",
+        [
+            "➕ הוספת משימה", "✅ תור בדיקה", "📑 כל המשימות",
+            "👩‍🏫 תצוגת מחנכים", "🔑 ניהול קודי מחנכים", "⚙️ תבניות וחוקים",
+        ],
+    )
+else:
+    st.sidebar.title(f"שלום, {st.session_state.teacher_name}")
+    page = "👩‍🏫 תצוגת מחנכים"
+
+st.sidebar.caption(APP_VERSION)
+if st.sidebar.button("התנתקות"):
+    st.session_state.role = None
+    st.session_state.pop("teacher_name", None)
+    st.rerun()
 
 # ============================================================
 # מסך 1: הוספת משימה
@@ -133,7 +182,7 @@ elif page == "✅ תור בדיקה":
                 st.rerun()
 
 # ============================================================
-# מסך 3: כל המשימות (בשלב זה - גם תצוגת המחנכים, פתוח לכולם)
+# מסך 3: כל המשימות - רכז/ת בלבד, עם עריכת סטטוס
 # ============================================================
 elif page == "📑 כל המשימות":
     st.header("כל המשימות")
@@ -180,6 +229,86 @@ elif page == "📑 כל המשימות":
                     task.status = STATUS_PENDING
                     session.commit()
                     st.rerun()
+
+# ============================================================
+# מסך: תצוגת מחנכים - טבלה ידידותית למובייל, לא ניתנת לעריכה
+# ============================================================
+elif page == "👩‍🏫 תצוגת מחנכים":
+    st.header("תצוגת מחנכים")
+
+    all_tasks = session.execute(
+        select(Task).order_by(Task.urgent.desc(), Task.deadline.is_(None), Task.deadline)
+    ).scalars().all()
+
+    open_only = st.checkbox("רק משימות פתוחות", value=True)
+    assignees = sorted({t.assignee for t in all_tasks if t.assignee})
+    options = ["הכל"] + assignees
+    default_index = 0
+    if st.session_state.role == "teacher":
+        teacher_name = st.session_state.teacher_name
+        if teacher_name in assignees:
+            default_index = options.index(teacher_name)
+    selected_assignee = st.selectbox("הצג משימות של", options, index=default_index)
+
+    view_tasks = all_tasks
+    if open_only:
+        view_tasks = [t for t in view_tasks if t.status != STATUS_CLOSED]
+    if selected_assignee != "הכל":
+        view_tasks = [t for t in view_tasks if t.assignee == selected_assignee]
+
+    if not view_tasks:
+        st.info("אין משימות להצגה.")
+    else:
+        st.dataframe(
+            [
+                {
+                    "כותרת": t.title or t.original_text,
+                    "למי מיועד": t.assignee or "",
+                    "דדליין": t.deadline or "",
+                    "דחוף": "🔴" if t.urgent else "",
+                    "סטטוס": t.status,
+                }
+                for t in view_tasks
+            ],
+            hide_index=True,
+            use_container_width=True,
+        )
+
+# ============================================================
+# מסך: ניהול קודי מחנכים - רכז/ת בלבד
+# ============================================================
+elif page == "🔑 ניהול קודי מחנכים":
+    st.header("ניהול קודי מחנכים")
+    st.caption("כל מחנך/ת מקבל/ת קוד אישי לכניסה למסך 'תצוגת מחנכים'. "
+               "הקוד לא מוצפן - זו דלת נעולה פשוטה, לא אבטחה אמיתית.")
+
+    with st.form("add_teacher"):
+        col1, col2 = st.columns(2)
+        name = col1.text_input("שם המחנך/ת")
+        code = col2.text_input("קוד זיהוי")
+        submitted = st.form_submit_button("הוסף מחנך/ת")
+        if submitted and name and code:
+            existing = session.execute(select(Teacher).where(Teacher.code == code)).scalars().first()
+            if existing:
+                st.error("קוד זה כבר קיים - בחר/י קוד אחר")
+            else:
+                session.add(Teacher(name=name, code=code))
+                session.commit()
+                st.success("המחנך/ת נוסף/ה")
+                st.rerun()
+
+    st.subheader("מחנכים קיימים")
+    teachers = session.execute(select(Teacher)).scalars().all()
+    if not teachers:
+        st.info("עדיין לא הוגדרו מחנכים.")
+    for t in teachers:
+        c1, c2, c3 = st.columns([3, 3, 1])
+        c1.write(t.name)
+        c2.write(t.code)
+        if c3.button("מחק", key=f"delteacher_{t.id}"):
+            session.delete(t)
+            session.commit()
+            st.rerun()
 
 # ============================================================
 # מסך 4: תבניות וחוקים - כאן נצבר "הידע" שהרכז מוסיף ידנית
